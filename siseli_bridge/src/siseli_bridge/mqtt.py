@@ -17,8 +17,13 @@ LOCAL_LIVE_SENSOR_KEYS = {
     "grid_v", "grid_hz", "pv_v", "pv_w", "bat_v", "bat_cap",
     "bat_charge_current", "dischg_current", "out_v", "out_hz",
     "load_w", "apparent_va", "load_pct", "status_code",
+    "load_current_a", "load_power_factor", "overload_flag_raw", "overload_active",
 }
-TEMPERATURE_SENSOR_KEYS = {"inverter_temperature_c"}
+TEMPERATURE_SENSOR_KEYS = {
+    "inverter_temperature_c", "charger_status", "grid_active", "on_battery",
+    "load_enabled", "charger_status_raw", "status_flags_4553_raw",
+    "status_flags_4554_raw",
+}
 
 _SECTION_PREFIXES = (
     "Device Info - ",
@@ -107,7 +112,8 @@ client = create_mqtt_client()
 
 def discovery_topic_for_key(key: str) -> str:
     group_device_id = device_id_for_group(get_sensor_group(key))
-    return f"{MQTT_DISCOVERY_PREFIX}/sensor/{group_device_id}/{key}/config"
+    platform = SENSORS.get(key, {}).get("platform", "sensor")
+    return f"{MQTT_DISCOVERY_PREFIX}/{platform}/{group_device_id}/{key}/config"
 
 
 def publish_sensor_discovery(key: str) -> None:
@@ -129,6 +135,10 @@ def publish_sensor_discovery(key: str) -> None:
         "device": device_info(group),
         "icon": meta.get("icon"),
     }
+    if meta.get("platform") == "binary_sensor":
+        payload["value_template"] = f"{{{{ 'ON' if value_json.{key} else 'OFF' }}}}"
+        payload["payload_on"] = "ON"
+        payload["payload_off"] = "OFF"
     telemetry_availability_topic = None
     if key in LOCAL_LIVE_SENSOR_KEYS:
         telemetry_availability_topic = LOCAL_TELEMETRY_AVAILABILITY_TOPIC

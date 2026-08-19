@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Read-only companion-block telemetry for charger state, grid active,
+  on-battery, output-enabled, and inverter temperature status.
+- A probable-overload binary sensor and disabled-by-default raw register 4516
+  diagnostic; the label remains cautious because the bit semantics are
+  community-derived.
+
+### Fixed
+
+- Corrected MAX-730 registers 4512/4513 to apparent VA/active W after repeated
+  natural samples showed the former mapping violated W <= VA, and added derived
+  output current and power factor.
+
 ## [2.5.25] - 2026-08-19
 
 ### Added

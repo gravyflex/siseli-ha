@@ -90,23 +90,56 @@ class TestModbusLive(unittest.TestCase):
 
     @mock.patch("src.siseli_bridge.core.set_temperature_telemetry_available")
     @mock.patch("src.siseli_bridge.core.publish_powmr_live_block")
-    def test_local_temperature_is_whole_degrees_and_separately_available(self, publish, availability):
-        frame = self._with_crc(b"\x05\x03\x02\x28\x00")
+    def test_local_companion_block_is_separately_available(self, publish, availability):
+        registers = [0] * 16
+        registers[7] = 0x0040
+        registers[8] = 0x0001
+        registers[9] = 2
+        registers[11] = 40
+        body = b"\x05\x03\x20" + b"".join(value.to_bytes(2, "little") for value in registers)
+        frame = self._with_crc(body)
         payload = json.dumps({
             "transaction": "Temp1234",
-            "address": 4557,
+            "address": 4546,
             "frame": base64.b64encode(frame).decode(),
         }).encode()
 
         self.assertTrue(core.accept_local_telemetry_datagram(payload, core.LOCAL_TELEMETRY_SOURCE))
-        publish.assert_called_once_with(4557, [40])
+        publish.assert_called_once_with(4546, registers)
         availability.assert_called_once_with(True)
 
-    def test_temperature_register_uses_whole_degree_scale(self):
+    def test_companion_block_decodes_status_and_whole_degree_temperature(self):
+        registers = [0] * 16
+        registers[7] = 0x0040
+        registers[8] = 0x0001
+        registers[9] = 2
+        registers[11] = 40
         with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
              mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
-            core.publish_powmr_live_block(4557, [40])
-        grouped.assert_called_once_with({"inverter_temperature_c": 40})
+            core.publish_powmr_live_block(4546, registers)
+        grouped.assert_called_once_with({
+            "grid_active": True,
+            "on_battery": False,
+            "load_enabled": True,
+            "charger_status": "Active",
+            "charger_status_raw": 2,
+            "status_flags_4553_raw": 0x0040,
+            "status_flags_4554_raw": 0x0001,
+            "inverter_temperature_c": 40,
+        })
+
+    def test_main_block_decodes_swapped_power_and_probable_overload(self):
+        registers = [0, 1153, 501, 0, 0, 265, 100, 0, 9, 1199, 502, 239, 217, 6, 6, 0x1] + [0] * 29
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4501, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["apparent_va"], 239)
+        self.assertEqual(state["load_w"], 217)
+        self.assertEqual(state["load_power_factor"], 90.8)
+        self.assertEqual(state["load_current_a"], 1.99)
+        self.assertTrue(state["overload_active"])
+        self.assertEqual(state["overload_flag_raw"], 0x1)
 
     @mock.patch("src.siseli_bridge.core.set_local_telemetry_available")
     def test_local_gateway_can_only_report_offline_status(self, availability):
@@ -136,6 +169,15 @@ class TestModbusLive(unittest.TestCase):
             discovery["availability"][1]["topic"],
             mqtt.TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC,
         )
+
+    def test_overload_discovery_is_binary_problem_entity(self):
+        with mock.patch.object(mqtt.client, "publish") as publish:
+            mqtt.publish_sensor_discovery("overload_active")
+        topic, raw = publish.call_args.args[:2]
+        discovery = json.loads(raw)
+        self.assertIn("/binary_sensor/", topic)
+        self.assertEqual(discovery["device_class"], "problem")
+        self.assertEqual(discovery["payload_on"], "ON")
 
     def test_discovery_clears_entities_without_validated_values(self):
         core._state.LAST_STATE.clear()

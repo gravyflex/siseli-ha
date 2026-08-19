@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Read-only PowMr companion status telemetry and probable-overload diagnostics.
+
+### Fixed
+
+- Corrected MAX-730 output W/VA mapping and added derived load current and
+  power factor.
+
 ## [2.5.24] - 2026-03-30
 
 ### Fixed

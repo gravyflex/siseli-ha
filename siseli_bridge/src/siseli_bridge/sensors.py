@@ -12,6 +12,15 @@ SENSORS: Dict[str, Dict[str, object]] = {
     "output_model": sensor("Device Info - Output Model", icon="mdi:transmission-tower", entity_category="diagnostic"),
     "mode": sensor("Device Info - Mode", icon="mdi:transmission-tower-export"),
     "status_code": sensor("Device Info - Status Code", icon="mdi:identifier", entity_category="diagnostic"),
+    "overload_flag_raw": sensor("Device Info - Probable Overload Flag Raw", icon="mdi:code-braces", entity_category="diagnostic", enabled_by_default=False),
+    "overload_active": sensor("Load Status - Probable Overload Active", platform="binary_sensor", device_class="problem", icon="mdi:alert-octagon"),
+    "charger_status": sensor("Battery Status - Charger Status", icon="mdi:battery-charging"),
+    "charger_status_raw": sensor("Battery Status - Charger Status Raw", icon="mdi:code-braces", entity_category="diagnostic", enabled_by_default=False),
+    "status_flags_4553_raw": sensor("Device Info - Status Flags 4553 Raw", icon="mdi:code-braces", entity_category="diagnostic", enabled_by_default=False),
+    "status_flags_4554_raw": sensor("Device Info - Status Flags 4554 Raw", icon="mdi:code-braces", entity_category="diagnostic", enabled_by_default=False),
+    "grid_active": sensor("Grid Status - Grid Active", platform="binary_sensor", icon="mdi:transmission-tower"),
+    "on_battery": sensor("Battery Status - On Battery", platform="binary_sensor", icon="mdi:battery-arrow-down"),
+    "load_enabled": sensor("Load Status - Output Enabled", platform="binary_sensor", icon="mdi:power-plug"),
     "firmware_info": sensor("Device Info - Firmware Info", icon="mdi:chip", entity_category="diagnostic"),
     "firmware_version": sensor("Device Info - Firmware Version", icon="mdi:chip", entity_category="diagnostic"),
     "firmware_build_date": sensor("Device Info - Firmware Build Date", icon="mdi:calendar", entity_category="diagnostic"),
@@ -73,6 +82,8 @@ SENSORS: Dict[str, Dict[str, object]] = {
     "out_hz": sensor("Load Status - Output Frequency", unit="Hz", device_class="frequency", state_class="measurement", icon="mdi:current-ac"),
     "apparent_va": sensor("Load Status - Output Apparent Power", unit="VA", device_class="apparent_power", state_class="measurement", icon="mdi:flash"),
     "load_w": sensor("Load Status - Output Active Power", unit="W", device_class="power", state_class="measurement", icon="mdi:home-lightning-bolt"),
+    "load_current_a": sensor("Load Status - Output Current", unit="A", device_class="current", state_class="measurement", icon="mdi:current-ac"),
+    "load_power_factor": sensor("Load Status - Output Power Factor", unit="%", device_class="power_factor", state_class="measurement", icon="mdi:gauge"),
     "c_load_w": sensor("Load Status - Calculated Output Active Power", unit="W", device_class="power", state_class="measurement", icon="mdi:home-lightning-bolt"),
     "load_pct": sensor("Load Status - Output Load Percent", unit="%", state_class="measurement", icon="mdi:gauge"),
     "output_dc_comp": sensor("Load Status - Output DC Component", state_class="measurement", icon="mdi:tune-variant"),
@@ -328,5 +339,3 @@ def get_grouped_sensor_keys() -> Dict[str, list]:
     for keys in grouped.values():
         keys.sort()
     return grouped
-
-

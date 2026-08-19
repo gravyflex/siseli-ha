@@ -87,8 +87,8 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
         4509: ("dischg_current", 1.0),
         4510: ("out_v", 0.1),
         4511: ("out_hz", 0.1),
-        4512: ("load_w", 1.0),
-        4513: ("apparent_va", 1.0),
+        4512: ("apparent_va", 1.0),
+        4513: ("load_w", 1.0),
         4514: ("load_pct", 1.0),
         4530: ("status_code", 1.0),
         4557: ("inverter_temperature_c", 1.0),
@@ -114,16 +114,39 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             "dischg_current": values[8],
             "out_v": values[9] / 10.0,
             "out_hz": values[10] / 10.0,
-            "load_w": values[11],
-            "apparent_va": values[12],
+            # This inverter reports apparent power at 4512 and active power at
+            # 4513. Multiple natural-load samples confirmed the labels are
+            # reversed from some published PowMr maps (W must not exceed VA).
+            "apparent_va": values[11],
+            "load_w": values[12],
             "load_pct": values[13],
+            "overload_flag_raw": values[15],
+            # Published maps express the mask in wire-byte order. This bridge
+            # has already decoded the low-byte-first word, so 0x0100 becomes 1.
+            "overload_active": bool(values[15] & 0x0001),
             "status_code": values[29],
         }
-    # The companion 16-register block contains the HVM3.6M temperature sensor
-    # at 4557.  Retain the strict block length so an unrelated setting read can
-    # never be mistaken for a temperature value.
+        if values[11] > 0:
+            state_update["load_power_factor"] = round(100.0 * values[12] / values[11], 1)
+        if values[9] > 0:
+            state_update["load_current_a"] = round(values[11] / (values[9] / 10.0), 2)
+    # Read-only companion status block used by the original PowMr dongle.
+    # Retain the strict block length so setting reads cannot be misclassified.
     elif address == 4546 and len(values) == 16:
-        state_update = {"inverter_temperature_c": values[11]}
+        flags_4553 = values[7]
+        flags_4554 = values[8]
+        state_update = {
+            # Community masks are written for the raw big-endian view. Swap
+            # those masks because values here are already low-byte-first words.
+            "grid_active": bool(flags_4554 & (0x0001 | 0x0080)),
+            "on_battery": bool(flags_4554 & 0x0100),
+            "load_enabled": bool(flags_4553 & 0x0040),
+            "charger_status": {0: "Off", 1: "Idle", 2: "Active"}.get(values[9], f"Code {values[9]} (variant)"),
+            "charger_status_raw": values[9],
+            "status_flags_4553_raw": flags_4553,
+            "status_flags_4554_raw": flags_4554,
+            "inverter_temperature_c": values[11],
+        }
 
     if not state_update:
         return
@@ -292,7 +315,7 @@ def accept_local_telemetry_datagram(payload: bytes, source_ip: str) -> bool:
         return False
     frame_spec = {
         4501: (95, b"\x05\x03\x5a", range(3, 93, 2)),
-        4557: (7, b"\x05\x03\x02", range(3, 5, 2)),
+        4546: (37, b"\x05\x03\x20", range(3, 35, 2)),
     }.get(address)
     if (
         not isinstance(transaction, str)

@@ -20,8 +20,15 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
   independently validates transaction format, function, address, frame length,
   and Modbus CRC before publishing it.
 - Gives locally polled sensors a dedicated MQTT availability topic.
-- Reads register `4557` as whole-degree inverter temperature and keeps its
-  availability independent from the one-minute live telemetry block.
+- Reads the original-dongle companion block at `4546`/count 16 every five
+  minutes. It exposes charger state, grid/on-battery/output flags, and register
+  `4557` as whole-degree inverter temperature with availability independent
+  from the one-minute live block.
+- Corrects this MAX-730 variant's 4512/4513 mapping to apparent VA/active W,
+  adds derived output current and power factor, and exposes register 4516 as a
+  cautious probable-overload binary diagnostic plus its raw value.
+- Preserves raw 4553-4555 diagnostics (disabled by default) and reports unknown
+  model-specific charger codes explicitly instead of guessing their meaning.
 - Publishes discovery only for sensors with validated values, clears stale
   retained definitions for unobserved sensors, and omits null grouped state.
 - Adds regression coverage for frame validation, byte order, availability, and
