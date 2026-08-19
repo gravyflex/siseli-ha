@@ -148,6 +148,30 @@ class TestModbusLive(unittest.TestCase):
         self.assertTrue(state["overload_active"])
         self.assertEqual(state["overload_flag_raw"], 0x1)
 
+    def test_main_block_derives_useful_pv_values(self):
+        registers = [0] * 45
+        registers[3] = 1000  # 100.0 V
+        registers[4] = 500   # 500 W PV
+        registers[12] = 217  # 217 W load
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4501, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["pv_current_a"], 5.0)
+        self.assertEqual(state["pv_surplus_w"], 283)
+        self.assertTrue(state["pv_generating"])
+
+    def test_main_block_reports_zero_pv_derivatives_at_night(self):
+        registers = [0] * 45
+        registers[12] = 217
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4501, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["pv_current_a"], 0.0)
+        self.assertEqual(state["pv_surplus_w"], 0)
+        self.assertFalse(state["pv_generating"])
+
     def test_main_block_decodes_read_only_lcd_program_values(self):
         registers = [0] * 45
         registers[34:45] = [0x0145, 2, 2, 0, 2, 0, 80, 120, 40, 240, 270]
@@ -218,6 +242,18 @@ class TestModbusLive(unittest.TestCase):
         self.assertIn("/binary_sensor/", topic)
         self.assertEqual(discovery["device_class"], "problem")
         self.assertEqual(discovery["payload_on"], "ON")
+
+    def test_pv_generating_discovery_is_binary_entity(self):
+        with mock.patch.object(mqtt.client, "publish") as publish:
+            mqtt.publish_sensor_discovery("pv_generating")
+        topic, raw = publish.call_args.args[:2]
+        discovery = json.loads(raw)
+        self.assertIn("/binary_sensor/", topic)
+        self.assertEqual(discovery["payload_on"], "ON")
+        self.assertEqual(
+            discovery["availability"][1]["topic"],
+            mqtt.LOCAL_TELEMETRY_AVAILABILITY_TOPIC,
+        )
 
     def test_discovery_clears_entities_without_validated_values(self):
         core._state.LAST_STATE.clear()

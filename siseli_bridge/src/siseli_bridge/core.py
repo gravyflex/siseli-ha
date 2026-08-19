@@ -104,11 +104,20 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
     # blocks as this model family has variant-specific holding registers.
     elif address == 4501 and len(values) == 45:
         settings_flags = values[34]
+        pv_voltage = values[3] / 10.0
+        pv_power = values[4]
+        load_power = values[12]
         state_update = {
             "grid_v": values[1] / 10.0,
             "grid_hz": values[2] / 10.0,
-            "pv_v": values[3] / 10.0,
-            "pv_w": values[4],
+            "pv_v": pv_voltage,
+            "pv_w": pv_power,
+            # This model exposes PV voltage and power but no PV-current
+            # register in its live block. Make the derived nature explicit in
+            # discovery while still providing the useful electrical value.
+            "pv_current_a": round(pv_power / pv_voltage, 2) if pv_voltage > 0 else 0.0,
+            "pv_surplus_w": max(pv_power - load_power, 0),
+            "pv_generating": bool(pv_power > 0),
             "bat_v": values[5] / 10.0,
             "bat_cap": values[6],
             "bat_charge_current": values[7],
@@ -119,7 +128,7 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             # 4513. Multiple natural-load samples confirmed the labels are
             # reversed from some published PowMr maps (W must not exceed VA).
             "apparent_va": values[11],
-            "load_w": values[12],
+            "load_w": load_power,
             "load_pct": values[13],
             "overload_flag_raw": values[15],
             # Published maps express the mask in wire-byte order. This bridge

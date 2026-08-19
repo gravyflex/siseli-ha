@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 - A probable-overload binary sensor and disabled-by-default raw register 4516
   diagnostic; the label remains cautious because the bit semantics are
   community-derived.
+- Calculated PV current, PV surplus power, and a PV-generating binary sensor
+  derived from the validated local voltage, PV-power, and load-power sample.
 
 ### Fixed
 

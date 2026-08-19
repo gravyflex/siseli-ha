@@ -27,6 +27,11 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
 - Corrects this MAX-730 variant's 4512/4513 mapping to apparent VA/active W,
   adds derived output current and power factor, and exposes register 4516 as a
   cautious probable-overload binary diagnostic plus its raw value.
+- Expands the local PV device beyond its two raw registers (voltage and power)
+  with calculated PV current, surplus power after the current inverter load,
+  and a generating binary status. The inverter's live blocks do not expose PV
+  energy counters or forecasts; those require local Home Assistant integration
+  of PV power rather than pretending they are raw inverter measurements.
 - Preserves raw 4553-4555 diagnostics (disabled by default) and reports unknown
   model-specific charger codes explicitly instead of guessing their meaning.
 - Mirrors the inverter's numbered LCD configuration programs as read-only Home

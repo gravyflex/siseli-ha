@@ -14,7 +14,8 @@ LOCAL_TELEMETRY_AVAILABLE = False
 TEMPERATURE_TELEMETRY_AVAILABLE = False
 
 LOCAL_LIVE_SENSOR_KEYS = {
-    "grid_v", "grid_hz", "pv_v", "pv_w", "bat_v", "bat_cap",
+    "grid_v", "grid_hz", "pv_v", "pv_w", "pv_current_a",
+    "pv_surplus_w", "pv_generating", "bat_v", "bat_cap",
     "bat_charge_current", "dischg_current", "out_v", "out_hz",
     "load_w", "apparent_va", "load_pct", "status_code",
     "load_current_a", "load_power_factor", "overload_flag_raw", "overload_active",
