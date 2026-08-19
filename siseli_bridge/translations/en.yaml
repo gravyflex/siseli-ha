@@ -77,6 +77,9 @@ configuration:
   LOCAL_TELEMETRY_AVAILABILITY_TOPIC:
     name: 'Local Telemetry Availability Topic'
     description: 'Dedicated MQTT availability topic for sensors populated by the trusted local telemetry gateway.'
+  TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC:
+    name: 'Temperature Telemetry Availability Topic'
+    description: 'Dedicated MQTT availability topic for the separately polled inverter temperature sensor.'
   SNIFF_IFACE:
     name: 'Network Sniffer Interface'
     description: "Advanced: Specific network interface to intercept traffic on (e.g., 'eth0'). Leave blank for auto-detection."

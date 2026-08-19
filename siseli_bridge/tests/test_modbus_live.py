@@ -1,4 +1,4 @@
-"""Regression coverage for local live telemetry and MQTT availability."""
+"""Regression coverage for validated telemetry and MQTT availability."""
 import base64
 import json
 import unittest
@@ -88,6 +88,26 @@ class TestModbusLive(unittest.TestCase):
         self.assertFalse(core.accept_local_telemetry_datagram(payload, "192.168.0.99"))
         publish.assert_not_called()
 
+    @mock.patch("src.siseli_bridge.core.set_temperature_telemetry_available")
+    @mock.patch("src.siseli_bridge.core.publish_powmr_live_block")
+    def test_local_temperature_is_whole_degrees_and_separately_available(self, publish, availability):
+        frame = self._with_crc(b"\x05\x03\x02\x28\x00")
+        payload = json.dumps({
+            "transaction": "Temp1234",
+            "address": 4557,
+            "frame": base64.b64encode(frame).decode(),
+        }).encode()
+
+        self.assertTrue(core.accept_local_telemetry_datagram(payload, core.LOCAL_TELEMETRY_SOURCE))
+        publish.assert_called_once_with(4557, [40])
+        availability.assert_called_once_with(True)
+
+    def test_temperature_register_uses_whole_degree_scale(self):
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4557, [40])
+        grouped.assert_called_once_with({"inverter_temperature_c": 40})
+
     @mock.patch("src.siseli_bridge.core.set_local_telemetry_available")
     def test_local_gateway_can_only_report_offline_status(self, availability):
         offline = json.dumps({"kind": "status", "available": False}).encode()
@@ -107,6 +127,15 @@ class TestModbusLive(unittest.TestCase):
             mqtt.LOCAL_TELEMETRY_AVAILABILITY_TOPIC,
         )
         self.assertNotIn("availability_topic", discovery)
+
+    def test_temperature_discovery_uses_separate_availability(self):
+        with mock.patch.object(mqtt.client, "publish") as publish:
+            mqtt.publish_sensor_discovery("inverter_temperature_c")
+        discovery = json.loads(publish.call_args.args[1])
+        self.assertEqual(
+            discovery["availability"][1]["topic"],
+            mqtt.TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC,
+        )
 
     def test_discovery_clears_entities_without_validated_values(self):
         core._state.LAST_STATE.clear()

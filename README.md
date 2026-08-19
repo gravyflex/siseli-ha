@@ -20,6 +20,8 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
   independently validates transaction format, function, address, frame length,
   and Modbus CRC before publishing it.
 - Gives locally polled sensors a dedicated MQTT availability topic.
+- Reads register `4557` as whole-degree inverter temperature and keeps its
+  availability independent from the one-minute live telemetry block.
 - Publishes discovery only for sensors with validated values, clears stale
   retained definitions for unobserved sensors, and omits null grouped state.
 - Adds regression coverage for frame validation, byte order, availability, and

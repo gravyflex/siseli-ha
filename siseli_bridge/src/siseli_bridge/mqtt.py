@@ -11,12 +11,14 @@ from .sensors import SENSORS, get_group_title, get_grouped_sensor_keys, get_sens
 
 RUNNING = True
 LOCAL_TELEMETRY_AVAILABLE = False
+TEMPERATURE_TELEMETRY_AVAILABLE = False
 
 LOCAL_LIVE_SENSOR_KEYS = {
     "grid_v", "grid_hz", "pv_v", "pv_w", "bat_v", "bat_cap",
     "bat_charge_current", "dischg_current", "out_v", "out_hz",
     "load_w", "apparent_va", "load_pct", "status_code",
 }
+TEMPERATURE_SENSOR_KEYS = {"inverter_temperature_c"}
 
 _SECTION_PREFIXES = (
     "Device Info - ",
@@ -127,7 +129,12 @@ def publish_sensor_discovery(key: str) -> None:
         "device": device_info(group),
         "icon": meta.get("icon"),
     }
+    telemetry_availability_topic = None
     if key in LOCAL_LIVE_SENSOR_KEYS:
+        telemetry_availability_topic = LOCAL_TELEMETRY_AVAILABILITY_TOPIC
+    elif key in TEMPERATURE_SENSOR_KEYS:
+        telemetry_availability_topic = TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC
+    if telemetry_availability_topic:
         payload.pop("availability_topic")
         payload.pop("payload_available")
         payload.pop("payload_not_available")
@@ -138,7 +145,7 @@ def publish_sensor_discovery(key: str) -> None:
                 "payload_not_available": "offline",
             },
             {
-                "topic": LOCAL_TELEMETRY_AVAILABILITY_TOPIC,
+                "topic": telemetry_availability_topic,
                 "payload_available": "online",
                 "payload_not_available": "offline",
             },
@@ -210,12 +217,23 @@ def set_local_telemetry_available(available: bool) -> None:
     )
 
 
+def set_temperature_telemetry_available(available: bool) -> None:
+    global TEMPERATURE_TELEMETRY_AVAILABLE
+    TEMPERATURE_TELEMETRY_AVAILABLE = available
+    client.publish(
+        TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC,
+        "online" if available else "offline",
+        retain=True,
+    )
+
+
 def on_connect(_client, _userdata, _flags, rc, _properties=None):
     code = int(rc) if rc is not None else -1
     if code == 0:
         log(f"[HA MQTT] Connected to {MQTT_HOST}:{MQTT_PORT}", level="info")
         publish_discovery()
         set_local_telemetry_available(LOCAL_TELEMETRY_AVAILABLE)
+        set_temperature_telemetry_available(TEMPERATURE_TELEMETRY_AVAILABLE)
         if any(v is not None for v in _state.LAST_STATE.values()):
             publish_grouped_state(_state.LAST_STATE)
     else:

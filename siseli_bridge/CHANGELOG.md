@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - Source-restricted UDP receiver for independently validated, read-only local
   telemetry frames.
 - Dedicated local-telemetry MQTT availability for affected live sensors.
+- Independent temperature-telemetry availability and whole-degree decoding for
+  the confirmed HVM3.6M register `4557`.
 - Regression tests covering NUL-prefixed envelopes, transaction correlation,
   CRC/length/source validation, byte order, and availability behavior.
 

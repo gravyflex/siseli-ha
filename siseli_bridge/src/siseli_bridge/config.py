@@ -39,6 +39,10 @@ LOCAL_TELEMETRY_AVAILABILITY_TOPIC = os.getenv(
     "LOCAL_TELEMETRY_AVAILABILITY_TOPIC",
     f"siseli/{DEVICE_ID}/local_telemetry/availability",
 )
+TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC = os.getenv(
+    "TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC",
+    f"siseli/{DEVICE_ID}/temperature_telemetry/availability",
+)
 
 SNIFF_IFACE = os.getenv("SNIFF_IFACE", "").strip() or None
 

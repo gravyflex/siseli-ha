@@ -23,6 +23,7 @@ from .mqtt import (
     publish_sensor_discovery,
     publish_grouped_state,
     set_local_telemetry_available,
+    set_temperature_telemetry_available,
     RUNNING,
     availability_topic_for_group,
 )
@@ -90,7 +91,7 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
         4513: ("apparent_va", 1.0),
         4514: ("load_pct", 1.0),
         4530: ("status_code", 1.0),
-        4557: ("inverter_temperature_c", 0.1),
+        4557: ("inverter_temperature_c", 1.0),
     }
     if len(values) == 1 and address in individual_live_registers:
         key, multiplier = individual_live_registers[address]
@@ -122,7 +123,7 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
     # at 4557.  Retain the strict block length so an unrelated setting read can
     # never be mistaken for a temperature value.
     elif address == 4546 and len(values) == 16:
-        state_update = {"inverter_temperature_c": values[11] / 10.0}
+        state_update = {"inverter_temperature_c": values[11]}
 
     if not state_update:
         return
@@ -275,30 +276,43 @@ def accept_local_telemetry_datagram(payload: bytes, source_ip: str) -> bool:
         if message.get("kind") == "status":
             if message.get("available") is not False:
                 return False
-            set_local_telemetry_available(False)
-            log_kv("[LOCAL TELEMETRY OFFLINE]", source=source_ip)
+            channel = message.get("channel", "live")
+            if channel in {"live", "all"}:
+                set_local_telemetry_available(False)
+            if channel in {"temperature", "all"}:
+                set_temperature_telemetry_available(False)
+            if channel not in {"live", "temperature", "all"}:
+                return False
+            log_kv("[LOCAL TELEMETRY OFFLINE]", source=source_ip, channel=channel)
             return True
         transaction = message["transaction"]
         address = message["address"]
         frame = base64.b64decode(message["frame"], validate=True)
     except (KeyError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
         return False
+    frame_spec = {
+        4501: (95, b"\x05\x03\x5a", range(3, 93, 2)),
+        4557: (7, b"\x05\x03\x02", range(3, 5, 2)),
+    }.get(address)
     if (
         not isinstance(transaction, str)
         or not transaction.isalnum()
         or not 1 <= len(transaction) <= 32
-        or address != 4501
-        or len(frame) != 95
-        or frame[:3] != b"\x05\x03\x5a"
+        or frame_spec is None
+        or len(frame) != frame_spec[0]
+        or frame[:3] != frame_spec[1]
         or not _valid_modbus_frame(frame)
     ):
         return False
     registers = [
         _decode_live_register(frame[offset:offset + 2])
-        for offset in range(3, 93, 2)
+        for offset in frame_spec[2]
     ]
     publish_powmr_live_block(address, registers)
-    set_local_telemetry_available(True)
+    if address == 4501:
+        set_local_telemetry_available(True)
+    else:
+        set_temperature_telemetry_available(True)
     log_kv("[LOCAL TELEMETRY]", source=source_ip, address=address, registers=len(registers))
     return True
 
@@ -540,6 +554,7 @@ def shutdown(*_args) -> None:
 
     try:
         set_local_telemetry_available(False)
+        set_temperature_telemetry_available(False)
         for group in get_grouped_sensor_keys():
             client.publish(availability_topic_for_group(group), "offline", retain=True)
         client.disconnect()
