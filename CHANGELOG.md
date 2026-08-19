@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Read-only Home Assistant entities for the supported PowMr LCD P-program
+  configuration values.
 - Read-only PowMr companion status telemetry and probable-overload diagnostics.
 
 ### Fixed

@@ -103,6 +103,7 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
     # and the ESPHome PowMr register map.  Do not decode partial/different
     # blocks as this model family has variant-specific holding registers.
     elif address == 4501 and len(values) == 45:
+        settings_flags = values[34]
         state_update = {
             "grid_v": values[1] / 10.0,
             "grid_hz": values[2] / 10.0,
@@ -125,6 +126,37 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             # has already decoded the low-byte-first word, so 0x0100 becomes 1.
             "overload_active": bool(values[15] & 0x0001),
             "status_code": values[29],
+            # Read-only mirrors of the inverter LCD P-program menu. The flags
+            # use masks byte-swapped from the published raw-wire register map.
+            "settings_flags_4535_raw": settings_flags,
+            "overload_restart_function": "On" if settings_flags & 0x0008 else "Off",
+            "over_temperature_restart_function": "On" if settings_flags & 0x0010 else "Off",
+            "buzzer_function": "On" if settings_flags & 0x0001 else "Off",
+            "automatic_return_to_first_page": "On" if settings_flags & 0x0040 else "Off",
+            "lcd_back_lighting": "On" if settings_flags & 0x0004 else "Off",
+            "beep_on_primary_source_fail": "On" if settings_flags & 0x0020 else "Off",
+            "overload_to_bypass_function": "On" if settings_flags & 0x0080 else "Off",
+            "record_fault_code": "On" if settings_flags & 0x0100 else "Off",
+            "battery_equalization_mode": "Enable" if settings_flags & 0x0200 else "Disable",
+            "battery_equalization_immediate": "On" if settings_flags & 0x0400 else "Off",
+            "charging_priority_order": {
+                0: "Utility first", 1: "Solar first", 2: "Solar and Utility", 3: "Solar only",
+            }.get(values[35], f"Code {values[35]} (variant)"),
+            "working_mode": {
+                0: "Utility first (USB)", 1: "Solar first (SUB)", 2: "SBU priority",
+            }.get(values[36], f"Code {values[36]} (variant)"),
+            "mains_input_range": {
+                0: "Appliances (90-280 VAC)", 1: "UPS (170-280 VAC)",
+            }.get(values[37], f"Code {values[37]} (variant)"),
+            "battery_type": {
+                0: "AGM/Sealed", 1: "Flooded", 2: "User-defined",
+            }.get(values[38], f"Code {values[38]} (variant)"),
+            "output_set_frequency": {0: 50, 1: 60}.get(values[39], values[39]),
+            "maximum_total_charging_current_a": values[40],
+            "output_set_voltage": values[41],
+            "max_utility_charge_current_a": values[42],
+            "return_to_mains_mode_voltage_v": values[43] / 10.0,
+            "return_to_battery_mode_voltage_v": values[44] / 10.0,
         }
         if values[11] > 0:
             state_update["load_power_factor"] = round(100.0 * values[12] / values[11], 1)
@@ -146,6 +178,13 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             "status_flags_4553_raw": flags_4553,
             "status_flags_4554_raw": flags_4554,
             "inverter_temperature_c": values[11],
+            "strong_charging_voltage_v": values[0] / 10.0,
+            "float_charging_voltage_v": values[1] / 10.0,
+            "low_electric_lock_voltage_v": values[2] / 10.0,
+            "battery_equalization_voltage_v": values[3] / 10.0,
+            "equalization_time": f"{values[4]} min",
+            "equalization_overtime": f"{values[5]} min",
+            "equalization_interval": f"{values[6]} days",
         }
 
     if not state_update:

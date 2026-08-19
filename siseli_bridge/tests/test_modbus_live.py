@@ -126,6 +126,13 @@ class TestModbusLive(unittest.TestCase):
             "status_flags_4553_raw": 0x0040,
             "status_flags_4554_raw": 0x0001,
             "inverter_temperature_c": 40,
+            "strong_charging_voltage_v": 0.0,
+            "float_charging_voltage_v": 0.0,
+            "low_electric_lock_voltage_v": 0.0,
+            "battery_equalization_voltage_v": 0.0,
+            "equalization_time": "0 min",
+            "equalization_overtime": "0 min",
+            "equalization_interval": "0 days",
         })
 
     def test_main_block_decodes_swapped_power_and_probable_overload(self):
@@ -140,6 +147,39 @@ class TestModbusLive(unittest.TestCase):
         self.assertEqual(state["load_current_a"], 1.99)
         self.assertTrue(state["overload_active"])
         self.assertEqual(state["overload_flag_raw"], 0x1)
+
+    def test_main_block_decodes_read_only_lcd_program_values(self):
+        registers = [0] * 45
+        registers[34:45] = [0x0145, 2, 2, 0, 2, 0, 80, 120, 40, 240, 270]
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4501, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["working_mode"], "SBU priority")
+        self.assertEqual(state["charging_priority_order"], "Solar and Utility")
+        self.assertEqual(state["mains_input_range"], "Appliances (90-280 VAC)")
+        self.assertEqual(state["battery_type"], "User-defined")
+        self.assertEqual(state["maximum_total_charging_current_a"], 80)
+        self.assertEqual(state["output_set_voltage"], 120)
+        self.assertEqual(state["return_to_mains_mode_voltage_v"], 24.0)
+        self.assertEqual(state["return_to_battery_mode_voltage_v"], 27.0)
+        self.assertEqual(state["buzzer_function"], "On")
+        self.assertEqual(state["overload_restart_function"], "Off")
+        self.assertEqual(state["record_fault_code"], "On")
+
+    def test_companion_block_decodes_read_only_battery_program_values(self):
+        registers = [288, 270, 220, 292, 60, 120, 30, 1137, 7, 10, 0, 35, 0, 0, 5, 1]
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4546, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["strong_charging_voltage_v"], 28.8)
+        self.assertEqual(state["float_charging_voltage_v"], 27.0)
+        self.assertEqual(state["low_electric_lock_voltage_v"], 22.0)
+        self.assertEqual(state["battery_equalization_voltage_v"], 29.2)
+        self.assertEqual(state["equalization_time"], "60 min")
+        self.assertEqual(state["equalization_overtime"], "120 min")
+        self.assertEqual(state["equalization_interval"], "30 days")
 
     @mock.patch("src.siseli_bridge.core.set_local_telemetry_available")
     def test_local_gateway_can_only_report_offline_status(self, availability):
@@ -201,11 +241,25 @@ class TestModbusLive(unittest.TestCase):
         )
 
     def test_grouped_state_omits_null_fields(self):
+        core._state.LAST_STATE.clear()
+        core._state.LAST_STATE.update({"grid_v": 113.7, "grid_hz": None})
         with mock.patch.object(mqtt.client, "publish") as publish:
             mqtt.publish_grouped_state({"grid_v": 113.7, "grid_hz": None})
         self.assertEqual(publish.call_count, 1)
         payload = json.loads(publish.call_args.args[1])
         self.assertEqual(payload, {"grid_v": 113.7})
+
+    def test_grouped_state_keeps_cached_keys_on_partial_update(self):
+        core._state.LAST_STATE.clear()
+        core._state.LAST_STATE.update({
+            "working_mode": "SBU priority",
+            "float_charging_voltage_v": 27.0,
+        })
+        with mock.patch.object(mqtt.client, "publish") as publish:
+            mqtt.publish_grouped_state({"float_charging_voltage_v": 27.0})
+        payload = json.loads(publish.call_args.args[1])
+        self.assertEqual(payload["working_mode"], "SBU priority")
+        self.assertEqual(payload["float_charging_voltage_v"], 27.0)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,8 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
   cautious probable-overload binary diagnostic plus its raw value.
 - Preserves raw 4553-4555 diagnostics (disabled by default) and reports unknown
   model-specific charger codes explicitly instead of guessing their meaning.
+- Mirrors the inverter's numbered LCD configuration programs as read-only Home
+  Assistant entities; see [PowMr LCD program telemetry](docs/powmr-lcd-programs.md).
 - Publishes discovery only for sensors with validated values, clears stale
   retained definitions for unobserved sensors, and omits null grouped state.
 - Adds regression coverage for frame validation, byte order, availability, and
