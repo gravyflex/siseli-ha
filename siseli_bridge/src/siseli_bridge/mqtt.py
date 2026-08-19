@@ -1,3 +1,4 @@
+# Local telemetry extensions for PowMr/Siseli bridges.
 import json
 from typing import Dict
 
@@ -9,6 +10,13 @@ from .loggers import log
 from .sensors import SENSORS, get_group_title, get_grouped_sensor_keys, get_sensor_group
 
 RUNNING = True
+LOCAL_TELEMETRY_AVAILABLE = False
+
+LOCAL_LIVE_SENSOR_KEYS = {
+    "grid_v", "grid_hz", "pv_v", "pv_w", "bat_v", "bat_cap",
+    "bat_charge_current", "dischg_current", "out_v", "out_hz",
+    "load_w", "apparent_va", "load_pct", "status_code",
+}
 
 _SECTION_PREFIXES = (
     "Device Info - ",
@@ -95,6 +103,11 @@ def create_mqtt_client() -> mqtt.Client:
 client = create_mqtt_client()
 
 
+def discovery_topic_for_key(key: str) -> str:
+    group_device_id = device_id_for_group(get_sensor_group(key))
+    return f"{MQTT_DISCOVERY_PREFIX}/sensor/{group_device_id}/{key}/config"
+
+
 def publish_sensor_discovery(key: str) -> None:
     if key not in SENSORS:
         return
@@ -102,7 +115,7 @@ def publish_sensor_discovery(key: str) -> None:
     meta = SENSORS[key]
     group = get_sensor_group(key)
     group_device_id = device_id_for_group(group)
-    topic = f"{MQTT_DISCOVERY_PREFIX}/sensor/{group_device_id}/{key}/config"
+    topic = discovery_topic_for_key(key)
     payload = {
         "name": display_sensor_name(str(meta["name"])),
         "unique_id": f"{group_device_id}_{key}",
@@ -114,6 +127,23 @@ def publish_sensor_discovery(key: str) -> None:
         "device": device_info(group),
         "icon": meta.get("icon"),
     }
+    if key in LOCAL_LIVE_SENSOR_KEYS:
+        payload.pop("availability_topic")
+        payload.pop("payload_available")
+        payload.pop("payload_not_available")
+        payload["availability"] = [
+            {
+                "topic": availability_topic_for_group(group),
+                "payload_available": "online",
+                "payload_not_available": "offline",
+            },
+            {
+                "topic": LOCAL_TELEMETRY_AVAILABILITY_TOPIC,
+                "payload_available": "online",
+                "payload_not_available": "offline",
+            },
+        ]
+        payload["availability_mode"] = "all"
 
     if meta.get("unit"):
         payload["unit_of_measurement"] = meta["unit"]
@@ -130,19 +160,39 @@ def publish_sensor_discovery(key: str) -> None:
     _state.PUBLISHED_SENSOR_KEYS.add(key)
 
 
+def clear_sensor_discovery(key: str) -> None:
+    """Remove a retained entity definition that has no validated state."""
+    if key not in SENSORS:
+        return
+    client.publish(discovery_topic_for_key(key), "", retain=True)
+    _state.PUBLISHED_SENSOR_KEYS.discard(key)
+
+
 def publish_discovery() -> None:
+    published = 0
+    cleared = 0
     for key in sorted(SENSORS.keys()):
-        publish_sensor_discovery(key)
+        if _state.LAST_STATE.get(key) is not None:
+            publish_sensor_discovery(key)
+            published += 1
+        else:
+            clear_sensor_discovery(key)
+            cleared += 1
 
     for group in get_grouped_sensor_keys():
         client.publish(availability_topic_for_group(group), "online", retain=True)
     _state.DISCOVERY_PUBLISHED = True
-    log("[HA MQTT] Discovery published", level="info")
+    log(
+        f"[HA MQTT] Discovery reconciled published={published} cleared={cleared}",
+        level="info",
+    )
 
 
 def publish_grouped_state(state_payload: Dict[str, object]) -> None:
     grouped_state: Dict[str, Dict[str, object]] = {}
     for key, value in state_payload.items():
+        if value is None:
+            continue
         group = get_sensor_group(key)
         grouped_state.setdefault(group, {})[key] = value
 
@@ -150,11 +200,22 @@ def publish_grouped_state(state_payload: Dict[str, object]) -> None:
         client.publish(state_topic_for_group(group), json.dumps(payload), retain=MQTT_RETAIN)
 
 
+def set_local_telemetry_available(available: bool) -> None:
+    global LOCAL_TELEMETRY_AVAILABLE
+    LOCAL_TELEMETRY_AVAILABLE = available
+    client.publish(
+        LOCAL_TELEMETRY_AVAILABILITY_TOPIC,
+        "online" if available else "offline",
+        retain=True,
+    )
+
+
 def on_connect(_client, _userdata, _flags, rc, _properties=None):
     code = int(rc) if rc is not None else -1
     if code == 0:
         log(f"[HA MQTT] Connected to {MQTT_HOST}:{MQTT_PORT}", level="info")
         publish_discovery()
+        set_local_telemetry_available(LOCAL_TELEMETRY_AVAILABLE)
         if any(v is not None for v in _state.LAST_STATE.values()):
             publish_grouped_state(_state.LAST_STATE)
     else:
@@ -177,6 +238,3 @@ def start_mqtt() -> None:
         client.loop_start()
     except Exception as exc:
         log(f"[HA MQTT ERROR] {exc}", level="error")
-
-
-

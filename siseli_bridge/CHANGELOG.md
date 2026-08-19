@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.5.25] - 2026-08-19
+
+### Added
+
+- Passive Siseli RPC request/reply correlation and bounded raw-register cache.
+- PowMr address-4501 live-block and individual-register decoding with the
+  low-byte-first word order observed on ECO/MAX-730 hardware.
+- Source-restricted UDP receiver for independently validated, read-only local
+  telemetry frames.
+- Dedicated local-telemetry MQTT availability for affected live sensors.
+- Regression tests covering NUL-prefixed envelopes, transaction correlation,
+  CRC/length/source validation, byte order, and availability behavior.
+
+### Fixed
+
+- Discovery now retains only entities backed by validated non-null state and
+  clears stale definitions for unobserved catalog entries.
+- Grouped MQTT state no longer publishes null-valued fields.
+- Cloud-originated RPC requests are parsed separately from inverter telemetry,
+  preventing request payloads from being treated as sensor state.
+
 ## [2.5.24] - 2026-03-30
 
 ### Fixed

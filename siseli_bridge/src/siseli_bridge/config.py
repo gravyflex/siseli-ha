@@ -1,3 +1,4 @@
+# Local telemetry extensions for PowMr/Siseli bridges.
 import ipaddress
 import re
 import os
@@ -10,6 +11,8 @@ ROUTER_IP = os.getenv("ROUTER_IP", "192.168.1.1")
 TARGET_HOST = os.getenv("TARGET_HOST", "8.212.18.157")
 TARGET_PORT = int(os.getenv("TARGET_PORT", "1883"))
 LISTEN_PORT = int(os.getenv("LISTEN_PORT", "18899"))
+LOCAL_TELEMETRY_PORT = int(os.getenv("LOCAL_TELEMETRY_PORT", "18900"))
+LOCAL_TELEMETRY_SOURCE = os.getenv("LOCAL_TELEMETRY_SOURCE", "192.168.0.241").strip()
 
 AUTO_INTERCEPT = os.getenv("AUTO_INTERCEPT", "true").strip().lower() in {"1", "true", "yes", "on"}
 INVERTER_MAC_CFG = os.getenv("INVERTER_MAC", "").strip().lower() or None
@@ -32,6 +35,10 @@ BATTERY_CAPACITY_PER_BATTERY_AH = float(os.getenv("BATTERY_CAPACITY_PER_BATTERY_
 
 STATE_TOPIC = os.getenv("STATE_TOPIC", f"siseli/{DEVICE_ID}/state")
 AVAILABILITY_TOPIC = os.getenv("AVAILABILITY_TOPIC", f"siseli/{DEVICE_ID}/availability")
+LOCAL_TELEMETRY_AVAILABILITY_TOPIC = os.getenv(
+    "LOCAL_TELEMETRY_AVAILABILITY_TOPIC",
+    f"siseli/{DEVICE_ID}/local_telemetry/availability",
+)
 
 SNIFF_IFACE = os.getenv("SNIFF_IFACE", "").strip() or None
 
@@ -103,6 +110,7 @@ def validate_config() -> None:
         ("TARGET_PORT", TARGET_PORT),
         ("MQTT_PORT", MQTT_PORT),
         ("LISTEN_PORT", LISTEN_PORT),
+        ("LOCAL_TELEMETRY_PORT", LOCAL_TELEMETRY_PORT),
     ]:
         if not (1 <= val <= 65535):
             errors.append(f"{name} must be 1-65535, got {val}")
@@ -115,6 +123,14 @@ def validate_config() -> None:
 
     if not TARGET_HOST.strip():
         errors.append("TARGET_HOST must not be empty")
+
+    try:
+        ipaddress.ip_address(LOCAL_TELEMETRY_SOURCE)
+    except ValueError:
+        errors.append(
+            "LOCAL_TELEMETRY_SOURCE is not a valid IP address: "
+            f"{LOCAL_TELEMETRY_SOURCE!r}"
+        )
 
     if INVERTER_COUNT < 1:
         errors.append(f"INVERTER_COUNT must be >= 1, got {INVERTER_COUNT}")

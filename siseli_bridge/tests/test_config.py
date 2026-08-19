@@ -18,6 +18,8 @@ class TestValidateConfig(unittest.TestCase):
         "MQTT_HOST": "core-mosquitto",
         "MQTT_PORT": "1883",
         "LISTEN_PORT": "18899",
+        "LOCAL_TELEMETRY_PORT": "18900",
+        "LOCAL_TELEMETRY_SOURCE": "192.168.0.241",
         "UPDATE_INTERVAL_SEC": "10",
         "INVERTER_COUNT": "1",
         "BATTERY_COUNT": "1",
@@ -62,6 +64,12 @@ class TestValidateConfig(unittest.TestCase):
     @mock.patch("src.siseli_bridge.config.os.makedirs")
     def test_zero_target_port_fails(self, _mock_makedirs):
         cfg = self._reload_config({"TARGET_PORT": "0"})
+        with self.assertRaises(SystemExit):
+            cfg.validate_config()
+
+    @mock.patch("src.siseli_bridge.config.os.makedirs")
+    def test_invalid_local_telemetry_source_fails(self, _mock_makedirs):
+        cfg = self._reload_config({"LOCAL_TELEMETRY_SOURCE": "not-an-ip"})
         with self.assertRaises(SystemExit):
             cfg.validate_config()
 
