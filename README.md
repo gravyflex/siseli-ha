@@ -1,6 +1,6 @@
 # ☀️ Siseli Solar Cloud Home Assistant Bridge
 
-[![Version](https://img.shields.io/badge/version-2.5.25-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.6.5-blue.svg)](CHANGELOG.md)
 [![HA Add-on](https://img.shields.io/badge/Home%20Assistant-Add--on-green.svg)](https://www.home-assistant.io/)
 
 > **Acknowledgment:** This project is an expanded and generalized fork of the excellent work originally created at [yuraantonov11/siseli-ha](https://github.com/yuraantonov11/siseli-ha). Huge thanks to the original author!
@@ -11,35 +11,59 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
 
 ---
 
-## ✨ What is New (2.5.25)
+## ✨ What is New (2.6.5)
 
-- Correlates observed Siseli Modbus read requests and replies, including the
-  leading-NUL JSON envelope and low-byte-first register words used by tested
-  PowMr ECO/MAX-730 hardware.
-- Accepts source-restricted UDP telemetry from a read-only gateway and
-  independently validates transaction format, function, address, frame length,
-  and Modbus CRC before publishing it.
-- Gives locally polled sensors a dedicated MQTT availability topic.
-- Reads the original-dongle companion block at `4546`/count 16 every five
-  minutes. It exposes charger state, grid/on-battery/output flags, and register
-  `4557` as whole-degree inverter temperature with availability independent
-  from the one-minute live block.
-- Corrects this MAX-730 variant's 4512/4513 mapping to apparent VA/active W,
-  adds derived output current and power factor, and exposes register 4516 as a
-  cautious probable-overload binary diagnostic plus its raw value.
-- Expands the local PV device beyond its two raw registers (voltage and power)
-  with calculated PV current, surplus power after the current inverter load,
-  and a generating binary status. The inverter's live blocks do not expose PV
-  energy counters or forecasts; those require local Home Assistant integration
-  of PV power rather than pretending they are raw inverter measurements.
-- Preserves raw 4553-4555 diagnostics (disabled by default) and reports unknown
-  model-specific charger codes explicitly instead of guessing their meaning.
-- Mirrors the inverter's numbered LCD configuration programs as read-only Home
-  Assistant entities; see [PowMr LCD program telemetry](docs/powmr-lcd-programs.md).
-- Publishes discovery only for sensors with validated values, clears stale
-  retained definitions for unobserved sensors, and omits null grouped state.
-- Adds regression coverage for frame validation, byte order, availability, and
-  discovery reconciliation.
+- Adds source-restricted, CRC-validated UDP telemetry from a read-only PowMr
+  gateway while keeping cloud forwarding independent.
+- Exposes validated live power, PV, inverter-temperature, status, overload, and
+  read-only LCD P-program values, including the model-correct P16 `OSO` label.
+- Gives live and temperature polling independent MQTT availability so a stale
+  poll cannot leave an old value looking current.
+- Keeps the 2.6.x truthfulness protections: discovery is published only for
+  validated values, null state is omitted, and undecoded entities stay disabled.
+
+## ✨ What is New (2.6.0)
+
+**This release removes sensors that were never read from your inverter.**
+
+Three blocks of the parser filled in around 37 sensors with hardcoded values whenever
+a raw field matched one specific inverter's configuration. That included twelve BMS
+alarm flags and eight fault indicators — `overloaded`, `machine_over_temperature`,
+`low_battery_alarm` and others — which were literal `"No"` strings in the source code.
+They could not report a fault under any circumstances. `mode` on the Main card was
+likewise the fixed string `"Battery Mode"`.
+
+Those sensors now report **Unknown**. That is not a regression: the previous value was
+not a reading. They stay in place, disabled by default on new installations, so that a
+future real decode brings them back with the same entity.
+
+Also fixed:
+
+- **Overload is now visible.** Output load above 100 % was being discarded, so an
+  overloaded inverter kept showing its last normal reading.
+- **The output relay can report Off.** It could previously only ever read `On`.
+- **Energy counters can no longer be poisoned.** BMS currents are range-checked, and
+  the calculated energy sensors only run on payloads that actually carry battery data.
+  A payload with no battery readings at all used to keep integrating a cached current.
+- **Six sensors had two sources disagreeing.** One temperature decoded as 117.5 °C from
+  one block and 51.0 °C from another; a state-of-charge percentage was being written
+  into a sensor measured in amps.
+- **`UPDATE_INTERVAL_SEC` now actually throttles.** It previously published on every
+  change, so the option did nothing despite being documented as saving database storage.
+- **Cell voltages no longer shift.** A collapsed cell used to renumber every cell after
+  it, so `cell_3_mv` would show physical cell 4.
+
+### If your energy totals look too high
+
+The calculated energy sensors are `total_increasing`, so an inflated value can never
+correct itself downward. Turn on **Reset Calculated Energy Counters**, restart the
+add-on once, then turn it back off.
+
+### New options
+
+- **Sensor Expiry (`EXPIRE_AFTER_SEC`)** — how long a value stays valid before Home
+  Assistant marks it unavailable. Default 600 seconds.
+- **Reset Calculated Energy Counters (`RESET_ENERGY_COUNTERS`)** — see above.
 
 ## 📘 Add-on Page Documentation
 
@@ -140,19 +164,34 @@ All calculated sensors use the `c_` prefix so they are easy to distinguish from 
 
 The add-on uses multiple methods for traffic interception. For the inverter to start sending data to this add-on, it needs to "think" it is sending it to the Siseli cloud:
 
-### Option A: ARP Spoofing (Auto-Intercept, Recommended)
+### Method A: ARP interception (recommended, default)
 
 With `AUTO_INTERCEPT` enabled, the add-on tricks the inverter into sending its data to Home Assistant instead of the router. The bridge parses the data and transparently forwards it to the Siseli cloud.
 
 > **⚠️ WARNING:** You are using ARP spoofing, which is a sensitive network technique. It can trigger security alerts on advanced network setups or enterprise routers (like UniFi or pfSense).
 
-### Option B: DNS Configuration
+### Method B: Router-side redirect (advanced, unsupported)
 
-Configure your router so that requests to the Siseli cloud domain resolve to the local IP address of your Home Assistant.
+Route traffic destined for the Siseli cloud IP through your Home Assistant host, and
+set `AUTO_INTERCEPT` to `false`.
 
-### Option C: Manual Redirect / Static Route (Legacy)
+This works only if all three hold, which is why it is not supported:
 
-Create a static route on your router that redirects traffic for the target IP `8.212.18.157` to the IP of your Home Assistant.
+- the redirect must preserve `TARGET_HOST` (`8.212.18.157`) as the **destination IP**.
+  The bridge matches on that address, so anything that rewrites the destination — a DNS
+  override, a NAT redirect — is not seen at all;
+- the Home Assistant host must have `net.ipv4.ip_forward` enabled, or the inverter loses
+  its connection entirely;
+- your router must support policy routing of a single destination address.
+
+If you cannot use ARP interception, **switch port mirroring (SPAN) is the better
+answer**: mirror the inverter's port to the Home Assistant host and leave
+`AUTO_INTERCEPT` off. The sniffer is passive, so nothing else is required, and the
+inverter's traffic is never touched.
+
+> A DNS override pointing the Siseli domain at Home Assistant does **not** work. There
+> is no listener — the bridge observes traffic, it does not terminate it — so the
+> inverter's connection is simply refused.
 
 ---
 
@@ -208,19 +247,32 @@ _Note: It may work out-of-the-box on other Siseli-based devices listed in the Su
 
 - **Check MQTT Connection:** Ensure your Mosquitto broker is running and the add-on logs show a successful connection.
 - **Verify Inverter IP:** Double-check that `INVERTER_IP` and `ROUTER_IP` are exactly correct in the configuration.
-- **Disable AUTO_INTERCEPT:** If ARP spoofing is blocked by your router, set `AUTO_INTERCEPT` to `false` and try the **DNS Configuration** or **Static Route** methods instead.
+- **Set `SNIFF_IFACE` explicitly:** auto-detection picks the wrong interface on hosts with several.
+- **Pin the MAC addresses:** fill in `INVERTER_MAC` and `ROUTER_MAC` rather than relying on discovery.
+- **Check the health line:** it reports the addresses actually seen, and any non-broker inverter packets that were dropped.
+- **Turn on the right diagnostics:** set **Debug Flags** to `blocks` and `unparsed_publish` and **Log Level** to `info`. If `unparsed_publish` produces output, the payload is arriving but the block layout is unrecognised — open an issue with those lines.
+- **If ARP interception is blocked by your network:** use switch port mirroring (SPAN) toward the Home Assistant host and set `AUTO_INTERCEPT` to `false`.
 
-**After upgrading, I see duplicate/stale entities in Home Assistant**
+**After upgrading, I see duplicate or stale entities in Home Assistant**
 
-- Because the bridge now uses per-section device IDs, entity `unique_id` values changed.
-- Remove old retained discovery payloads from your broker, then restart the add-on so discovery is republished with the new grouped devices.
-- Example cleanup command:
+This is handled automatically from 2.6.1. On the first start after an upgrade the
+bridge clears retained discovery messages left behind by earlier versions that grouped
+sensors differently, so no manual broker cleanup is needed. The **Clean Up Stale
+Entities** option controls it if you ever need to turn it off.
 
-```bash
-mosquitto_pub -h core-mosquitto -t 'homeassistant/sensor/siseli_inverter_1/+/config' -n -r
-```
+**Some sensors show "Unknown"**
 
-- If your old `DEVICE_ID` was not `siseli_inverter_1`, replace it in that topic pattern.
+From 2.6.0 the bridge publishes a value only when it decoded one from your inverter.
+Around 38 sensors — the fault indicators, the BMS alarm flags, `Mode` and the light
+statuses — previously showed hardcoded values that were never read from the device, so
+they now read Unknown until a real decode exists for them. They are disabled by default
+on new installations.
+
+**PV Voltage, PV Current and PV Power all read zero**
+
+Expected on a single-string system: your array reports on the channel the inverter
+calls PV2, and the official app shows the same split. `Generation Power` sums both
+channels, so your totals are correct.
 
 ---
 
