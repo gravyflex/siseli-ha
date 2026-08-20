@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-echo "--- Siseli Inverter Bridge 2.6.5 ---"
+echo "--- Siseli Inverter Bridge 2.6.6 ---"
 
 export MQTT_HOST="$(bashio::config 'MQTT_HOST' 'core-mosquitto')"
 export MQTT_PORT="$(bashio::config 'MQTT_PORT' '1883')"
