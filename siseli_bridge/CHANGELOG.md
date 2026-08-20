@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.6.6] - 2026-08-20
+
+### Fixed
+
+- Validated local Modbus frames now refresh the shared telemetry watchdog. In
+  2.6.5, live local values continued updating but the bridge-level MQTT
+  availability still flipped offline after 180 seconds because only decoded
+  cloud payloads updated the watchdog timestamp.
+
 ## [2.6.5] - 2026-08-20
 
 ### Added

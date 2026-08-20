@@ -463,6 +463,11 @@ def accept_local_telemetry_datagram(payload: bytes, source_ip: str) -> bool:
         _decode_live_register(frame[offset:offset + 2])
         for offset in frame_spec[2]
     ]
+    # Local Modbus telemetry is as fully validated as a decoded cloud payload.
+    # Feed it into the shared freshness watchdog; otherwise the bridge-level
+    # availability flips offline after TELEMETRY_TIMEOUT_SEC even while these
+    # samples continue arriving every minute.
+    _state.LAST_TELEMETRY_TS = time.time()
     publish_powmr_live_block(address, registers)
     if address == 4501:
         set_local_telemetry_available(True)

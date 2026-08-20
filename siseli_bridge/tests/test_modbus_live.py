@@ -11,6 +11,7 @@ class TestModbusLive(unittest.TestCase):
     def setUp(self):
         self.last_state = dict(core._state.LAST_STATE)
         self.published_keys = set(core._state.PUBLISHED_SENSOR_KEYS)
+        self.last_telemetry_ts = core._state.LAST_TELEMETRY_TS
         core.PENDING_MODBUS.clear()
         core.MODBUS_REGISTERS.clear()
 
@@ -21,6 +22,7 @@ class TestModbusLive(unittest.TestCase):
         core._state.LAST_STATE.update(self.last_state)
         core._state.PUBLISHED_SENSOR_KEYS.clear()
         core._state.PUBLISHED_SENSOR_KEYS.update(self.published_keys)
+        core._state.LAST_TELEMETRY_TS = self.last_telemetry_ts
 
     @staticmethod
     def _with_crc(data: bytes) -> bytes:
@@ -72,9 +74,11 @@ class TestModbusLive(unittest.TestCase):
             "frame": base64.b64encode(frame).decode(),
         }).encode()
 
-        self.assertTrue(core.accept_local_telemetry_datagram(payload, core.LOCAL_TELEMETRY_SOURCE))
+        with mock.patch("src.siseli_bridge.core.time.time", return_value=12345.0):
+            self.assertTrue(core.accept_local_telemetry_datagram(payload, core.LOCAL_TELEMETRY_SOURCE))
         publish.assert_called_once_with(4501, registers)
         availability.assert_called_once_with(True)
+        self.assertEqual(core._state.LAST_TELEMETRY_TS, 12345.0)
 
         publish.reset_mock()
         damaged = bytearray(frame)
