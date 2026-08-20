@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected the POW-LVM3.6M P16 charger-source enum so register 4536 value 2
+  matches the inverter LCD's `OSO` / Only Solar setting.
 - Corrected MAX-730 registers 4512/4513 to apparent VA/active W after repeated
   natural samples showed the former mapping violated W <= VA, and added derived
   output current and power factor.

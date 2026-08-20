@@ -148,8 +148,12 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             "record_fault_code": "On" if settings_flags & 0x0100 else "Off",
             "battery_equalization_mode": "Enable" if settings_flags & 0x0200 else "Disable",
             "battery_equalization_immediate": "On" if settings_flags & 0x0400 else "Off",
+            # POW-LVM3.6M P16 has three charger-source choices. This model's
+            # live register 4536 value 2 was confirmed against LCD code OSO.
             "charging_priority_order": {
-                0: "Utility first", 1: "Solar first", 2: "Solar and Utility", 3: "Solar only",
+                0: "Solar first (CSO)",
+                1: "Solar and Utility (SNU)",
+                2: "Only Solar (OSO)",
             }.get(values[35], f"Code {values[35]} (variant)"),
             "working_mode": {
                 0: "Utility first (USB)", 1: "Solar first (SUB)", 2: "SBU priority",

@@ -34,6 +34,12 @@ already used for live telemetry; the bridge has no Modbus write path.
 | P35 | Battery equalization interval | 4552 |
 | P36 | Equalization activate immediately | 4535 flag |
 
+For this POW-LVM3.6M variant, P16 register 4536 uses the three LCD choices
+`0 = Solar first (CSO)`, `1 = Solar and Utility (SNU)`, and
+`2 = Only Solar (OSO)`. The installed inverter's LCD and raw value 2 were
+cross-checked on 2026-08-20; do not apply the four-mode enum used by other
+PowMr model families.
+
 Registers 4501-4545 refresh every minute. Registers 4546-4561 refresh every
 five minutes. Unknown model-specific enum values are displayed as a numeric
 variant code rather than being assigned an unverified label.
@@ -56,7 +62,7 @@ The Norwood 24 V / 120 V inverter reported these values on 2026-08-19:
 - P11 40 A
 - P12 24.0 V
 - P13 27.0 V
-- P16 Solar and Utility
+- P16 Only Solar (OSO)
 - P26 28.8 V
 - P27 27.0 V
 - P29 22.0 V

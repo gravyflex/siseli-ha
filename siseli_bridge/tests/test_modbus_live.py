@@ -180,7 +180,7 @@ class TestModbusLive(unittest.TestCase):
             core.publish_powmr_live_block(4501, registers)
         state = grouped.call_args.args[0]
         self.assertEqual(state["working_mode"], "SBU priority")
-        self.assertEqual(state["charging_priority_order"], "Solar and Utility")
+        self.assertEqual(state["charging_priority_order"], "Only Solar (OSO)")
         self.assertEqual(state["mains_input_range"], "Appliances (90-280 VAC)")
         self.assertEqual(state["battery_type"], "User-defined")
         self.assertEqual(state["maximum_total_charging_current_a"], 80)
@@ -190,6 +190,21 @@ class TestModbusLive(unittest.TestCase):
         self.assertEqual(state["buzzer_function"], "On")
         self.assertEqual(state["overload_restart_function"], "Off")
         self.assertEqual(state["record_fault_code"], "On")
+
+    def test_p16_uses_powmr_three_mode_charger_source_enum(self):
+        expected = {
+            0: "Solar first (CSO)",
+            1: "Solar and Utility (SNU)",
+            2: "Only Solar (OSO)",
+        }
+        for raw_value, label in expected.items():
+            registers = [0] * 45
+            registers[35] = raw_value
+            with self.subTest(raw_value=raw_value), \
+                 mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+                 mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+                core.publish_powmr_live_block(4501, registers)
+            self.assertEqual(grouped.call_args.args[0]["charging_priority_order"], label)
 
     def test_companion_block_decodes_read_only_battery_program_values(self):
         registers = [288, 270, 220, 292, 60, 120, 30, 1137, 7, 10, 0, 35, 0, 0, 5, 1]
