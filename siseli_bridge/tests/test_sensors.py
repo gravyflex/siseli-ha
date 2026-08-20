@@ -32,6 +32,8 @@ class TestSensors(unittest.TestCase):
                     self.assertIsInstance(config["device_class"], str)
                 if "state_class" in config:
                     self.assertIsInstance(config["state_class"], str)
+                if "platform" in config:
+                    self.assertEqual(config["platform"], "binary_sensor")
 
     def test_unique_sensor_names(self):
         """Ensure no two sensors share the same Home Assistant name to avoid collisions."""

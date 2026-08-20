@@ -1,6 +1,6 @@
 # ☀️ Siseli Solar Cloud Home Assistant Bridge
 
-[![Version](https://img.shields.io/badge/version-2.5.24-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.5.25-blue.svg)](CHANGELOG.md)
 [![HA Add-on](https://img.shields.io/badge/Home%20Assistant-Add--on-green.svg)](https://www.home-assistant.io/)
 
 > **Acknowledgment:** This project is an expanded and generalized fork of the excellent work originally created at [yuraantonov11/siseli-ha](https://github.com/yuraantonov11/siseli-ha). Huge thanks to the original author!
@@ -11,13 +11,35 @@ Unleash your Siseli-compatible inverter into Home Assistant — **100% locally a
 
 ---
 
-## ✨ What is New (2.5.24)
+## ✨ What is New (2.5.25)
 
-- Logging behavior fix:
-  - `LOG_LEVEL=error` now suppresses routine informational/debug output
-  - parser block debug spam (`[DEBUG BLOCK]`) is now filtered by log level
-  - startup/MQTT/runtime logs now use explicit severity levels
-- Added regression tests for level-aware logging behavior.
+- Correlates observed Siseli Modbus read requests and replies, including the
+  leading-NUL JSON envelope and low-byte-first register words used by tested
+  PowMr ECO/MAX-730 hardware.
+- Accepts source-restricted UDP telemetry from a read-only gateway and
+  independently validates transaction format, function, address, frame length,
+  and Modbus CRC before publishing it.
+- Gives locally polled sensors a dedicated MQTT availability topic.
+- Reads the original-dongle companion block at `4546`/count 16 every five
+  minutes. It exposes charger state, grid/on-battery/output flags, and register
+  `4557` as whole-degree inverter temperature with availability independent
+  from the one-minute live block.
+- Corrects this MAX-730 variant's 4512/4513 mapping to apparent VA/active W,
+  adds derived output current and power factor, and exposes register 4516 as a
+  cautious probable-overload binary diagnostic plus its raw value.
+- Expands the local PV device beyond its two raw registers (voltage and power)
+  with calculated PV current, surplus power after the current inverter load,
+  and a generating binary status. The inverter's live blocks do not expose PV
+  energy counters or forecasts; those require local Home Assistant integration
+  of PV power rather than pretending they are raw inverter measurements.
+- Preserves raw 4553-4555 diagnostics (disabled by default) and reports unknown
+  model-specific charger codes explicitly instead of guessing their meaning.
+- Mirrors the inverter's numbered LCD configuration programs as read-only Home
+  Assistant entities; see [PowMr LCD program telemetry](docs/powmr-lcd-programs.md).
+- Publishes discovery only for sensors with validated values, clears stale
+  retained definitions for unobserved sensors, and omits null grouped state.
+- Adds regression coverage for frame validation, byte order, availability, and
+  discovery reconciliation.
 
 ## 📘 Add-on Page Documentation
 
@@ -63,7 +85,7 @@ Ensure the official **Mosquitto Broker** add-on is installed and configured:
 
 ### Step 2: Add Repository
 
-1. Copy this repository URL: `https://github.com/fadmaz/siseli-ha`
+1. Copy this repository URL: `https://github.com/gravyflex/siseli-ha`
 2. In Home Assistant, go to **Settings -> Add-ons -> Add-on Store**.
 3. Click the three dots in the top right -> **Repositories**.
 4. Paste the URL and click **Add**.
@@ -76,6 +98,16 @@ Ensure the official **Mosquitto Broker** add-on is installed and configured:
    - **INVERTER_IP**: The local IP of your inverter (e.g., `192.168.1.139`).
    - **ROUTER_IP**: The local IP of your router (e.g., `192.168.1.1`).
    - **AUTO_INTERCEPT**: Keep `true` to use ARP Spoofing (automatic interception).
+
+   When using the companion read-only gateway:
+   - Set **AUTO_INTERCEPT** to `false` if routing is already handled externally.
+   - Set **LOCAL_TELEMETRY_SOURCE** to the gateway IPv4 address.
+   - Keep **LOCAL_TELEMETRY_PORT** aligned with the gateway destination port
+     (default `18900`).
+
+The UDP receiver is telemetry-only. It accepts no inverter commands or Modbus
+write functions, and frames from any source other than
+`LOCAL_TELEMETRY_SOURCE` are rejected.
 
 - Optional parallel-system fields:
   - **INVERTER_COUNT**: Number of parallel inverters.

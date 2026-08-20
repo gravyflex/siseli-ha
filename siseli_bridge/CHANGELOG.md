@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Read-only Home Assistant telemetry for LCD programs P01-P36 backed by the
+  already-polled 4501/count-45 and 4546/count-16 register blocks.
+- Read-only companion-block telemetry for charger state, grid active,
+  on-battery, output-enabled, and inverter temperature status.
+- A probable-overload binary sensor and disabled-by-default raw register 4516
+  diagnostic; the label remains cautious because the bit semantics are
+  community-derived.
+- Calculated PV current, PV surplus power, and a PV-generating binary sensor
+  derived from the validated local voltage, PV-power, and load-power sample.
+
+### Fixed
+
+- Corrected the POW-LVM3.6M P16 charger-source enum so register 4536 value 2
+  matches the inverter LCD's `OSO` / Only Solar setting.
+- Corrected MAX-730 registers 4512/4513 to apparent VA/active W after repeated
+  natural samples showed the former mapping violated W <= VA, and added derived
+  output current and power factor.
+
+## [2.5.25] - 2026-08-19
+
+### Added
+
+- Passive Siseli RPC request/reply correlation and bounded raw-register cache.
+- PowMr address-4501 live-block and individual-register decoding with the
+  low-byte-first word order observed on ECO/MAX-730 hardware.
+- Source-restricted UDP receiver for independently validated, read-only local
+  telemetry frames.
+- Dedicated local-telemetry MQTT availability for affected live sensors.
+- Independent temperature-telemetry availability and whole-degree decoding for
+  the confirmed HVM3.6M register `4557`.
+- Regression tests covering NUL-prefixed envelopes, transaction correlation,
+  CRC/length/source validation, byte order, and availability behavior.
+
+### Fixed
+
+- Discovery now retains only entities backed by validated non-null state and
+  clears stale definitions for unobserved catalog entries.
+- Grouped MQTT state no longer publishes null-valued fields.
+- Cloud-originated RPC requests are parsed separately from inverter telemetry,
+  preventing request payloads from being treated as sensor state.
+
 ## [2.5.24] - 2026-03-30
 
 ### Fixed

@@ -1,8 +1,8 @@
 name: 'Siseli Inverter Bridge'
 description: 'Local bridge for Siseli-compatible inverters with MQTT discovery for Home Assistant.'
-version: '2.5.24'
+version: '2.5.25'
 slug: 'siseli_bridge'
-url: 'https://github.com/fadmaz/siseli-ha/blob/main/README.md'
+url: 'https://github.com/gravyflex/siseli-ha/blob/main/README.md'
 init: false
 arch:
   - aarch64
@@ -26,6 +26,8 @@ options:
   TARGET_HOST: '8.212.18.157'
   TARGET_PORT: 1883
   LISTEN_PORT: 18899
+  LOCAL_TELEMETRY_PORT: 18900
+  LOCAL_TELEMETRY_SOURCE: '192.168.0.241'
 
   INVERTER_IP: '192.168.1.139'
   ROUTER_IP: '192.168.1.1'
@@ -45,6 +47,8 @@ options:
 
   STATE_TOPIC: 'siseli/siseli_inverter_1/state'
   AVAILABILITY_TOPIC: 'siseli/siseli_inverter_1/availability'
+  LOCAL_TELEMETRY_AVAILABILITY_TOPIC: 'siseli/siseli_inverter_1/local_telemetry/availability'
+  TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC: 'siseli/siseli_inverter_1/temperature_telemetry/availability'
   SNIFF_IFACE: ''
   LOG_VERBOSE: true
   LOG_LEVEL: 'info'
@@ -60,6 +64,8 @@ schema:
   TARGET_HOST: str
   TARGET_PORT: int
   LISTEN_PORT: int
+  LOCAL_TELEMETRY_PORT: int
+  LOCAL_TELEMETRY_SOURCE: str
 
   INVERTER_IP: str
   ROUTER_IP: str
@@ -79,6 +85,8 @@ schema:
 
   STATE_TOPIC: str
   AVAILABILITY_TOPIC: str
+  LOCAL_TELEMETRY_AVAILABILITY_TOPIC: str
+  TEMPERATURE_TELEMETRY_AVAILABILITY_TOPIC: str
   SNIFF_IFACE: str?
   LOG_VERBOSE: bool
   LOG_LEVEL: list(debug|info|warning|error)
