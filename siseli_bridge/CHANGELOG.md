@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Validated local 4501/count-45 telemetry now publishes calculated battery
+  charge/discharge power and calculated grid-import power. This lets local
+  Home Assistant energy-flow cards use the local bridge as a drop-in
+  replacement for cloud-derived grid-flow sensors when the inverter is charging
+  from grid.
+
 ## [2.6.6] - 2026-08-20
 
 ### Fixed

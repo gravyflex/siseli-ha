@@ -188,7 +188,14 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
         settings_flags = values[34]
         pv_voltage = values[3] / 10.0
         pv_power = values[4]
+        bat_voltage = values[5] / 10.0
+        battery_charge_power = bat_voltage * values[7] if values[7] > 0 else 0.0
+        battery_discharge_power = bat_voltage * values[8] if values[8] > 0 else 0.0
         load_power = values[12]
+        grid_import_power = max(
+            load_power + battery_charge_power - pv_power - battery_discharge_power,
+            0.0,
+        )
         state_update = {
             "grid_v": values[1] / 10.0,
             "grid_hz": values[2] / 10.0,
@@ -200,10 +207,12 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             "pv_current_a": round(pv_power / pv_voltage, 2) if pv_voltage > 0 else 0.0,
             "pv_surplus_w": max(pv_power - load_power, 0),
             "pv_generating": bool(pv_power > 0),
-            "bat_v": values[5] / 10.0,
+            "bat_v": bat_voltage,
             "bat_cap": values[6],
             "bat_charge_current": values[7],
             "dischg_current": values[8],
+            "c_battery_charge_power_w": int(round(battery_charge_power)),
+            "c_battery_discharge_power_w": int(round(battery_discharge_power)),
             "out_v": values[9] / 10.0,
             "out_hz": values[10] / 10.0,
             # This inverter reports apparent power at 4512 and active power at
@@ -212,6 +221,7 @@ def publish_powmr_live_block(address: int, values: list[int]) -> None:
             "apparent_va": values[11],
             "load_w": load_power,
             "load_pct": values[13],
+            "c_grid_import_power_w": int(round(grid_import_power)),
             "overload_flag_raw": values[15],
             # Published maps express the mask in wire-byte order. This bridge
             # has already decoded the low-byte-first word, so 0x0100 becomes 1.

@@ -165,6 +165,22 @@ class TestModbusLive(unittest.TestCase):
         self.assertEqual(state["pv_surplus_w"], 283)
         self.assertTrue(state["pv_generating"])
 
+    def test_main_block_derives_local_flow_powers(self):
+        registers = [0] * 45
+        registers[3] = 1561  # 156.1 V PV
+        registers[4] = 617   # 617 W PV
+        registers[5] = 260   # 26.0 V battery
+        registers[7] = 21    # 21 A charging
+        registers[8] = 0     # not discharging
+        registers[12] = 231  # 231 W load
+        with mock.patch("src.siseli_bridge.core.publish_grouped_state") as grouped, \
+             mock.patch("src.siseli_bridge.core.publish_sensor_discovery"):
+            core.publish_powmr_live_block(4501, registers)
+        state = grouped.call_args.args[0]
+        self.assertEqual(state["c_battery_charge_power_w"], 546)
+        self.assertEqual(state["c_battery_discharge_power_w"], 0)
+        self.assertEqual(state["c_grid_import_power_w"], 160)
+
     def test_main_block_reports_zero_pv_derivatives_at_night(self):
         registers = [0] * 45
         registers[12] = 217
