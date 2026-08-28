@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [2.6.7] - 2026-08-28
+
 ### Added
 
 - Validated local 4501/count-45 telemetry now publishes calculated battery
